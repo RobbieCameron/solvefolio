@@ -99,6 +99,8 @@ export function gradeInterviewAnswer(input: { problem: Problem; solution: string
     !combined.includes("duplicate") && "Duplicate values or repeated states",
     input.problem.topic.toLowerCase().includes("graph") && !combined.includes("cycle") && "Cycles or disconnected components"
   ].filter(Boolean) as string[];
+  const evidenceStrengths = buildEvidenceStrengths(input.problem, combined, complexity, explanation);
+  const evidenceGaps = buildEvidenceGaps(input.problem, combined, complexity, explanation, missingEdgeCases);
 
   return {
     correctness,
@@ -107,6 +109,10 @@ export function gradeInterviewAnswer(input: { problem: Problem; solution: string
     edgeCases,
     score,
     missingEdgeCases,
+    evidenceStrengths,
+    evidenceGaps,
+    scoreBand: scoreBand(score),
+    percentileLabel: percentileLabel(score),
     summary:
       score >= 82
         ? "Strong interview answer. Tighten the edge-case pass and you can present this confidently."
@@ -209,4 +215,60 @@ function detectMasteredTopics(problems: Problem[]) {
 function scoreFromSignals(text: string, signals: string[], floor: number) {
   const hits = signals.filter((signal) => text.includes(signal)).length;
   return Math.min(98, floor + hits * 7 + Math.min(12, Math.floor(text.length / 120)));
+}
+
+function buildEvidenceStrengths(problem: Problem, combined: string, complexity: string, explanation: string) {
+  const topic = problem.topic.toLowerCase();
+  const strengths: string[] = [];
+
+  if (topic.includes("stack") || problem.title.toLowerCase().includes("parentheses")) {
+    if (combined.includes("stack")) strengths.push("Correctly identified stack as the optimal structure.");
+    if (combined.includes("leftover") || combined.includes("opening")) strengths.push("Discussed leftover opening bracket validation.");
+  }
+  if (topic.includes("array") || topic.includes("heap")) {
+    if (combined.includes("hash") || combined.includes("heap") || combined.includes("quickselect")) strengths.push("Selected a data structure aligned with the target complexity.");
+    if (combined.includes("duplicate")) strengths.push("Considered duplicate values instead of assuming unique inputs.");
+  }
+  if (topic.includes("graph") || topic.includes("union")) {
+    if (combined.includes("bfs") || combined.includes("dfs") || combined.includes("union")) strengths.push("Used traversal or union structure appropriate for connected components.");
+    if (combined.includes("cycle") || combined.includes("visited")) strengths.push("Accounted for revisits, cycles, or visited-state management.");
+  }
+  if (topic.includes("design")) {
+    if (combined.includes("hash") || combined.includes("map")) strengths.push("Explained constant-time lookup with a keyed index.");
+    if (combined.includes("list") || combined.includes("node")) strengths.push("Connected state updates to an explicit node/list structure.");
+  }
+  if (complexity.includes("o(")) strengths.push("Provided formal Big-O complexity.");
+  if (explanation.includes("because") || explanation.includes("invariant")) strengths.push("Explained reasoning instead of only describing code steps.");
+
+  return uniqueList(strengths).slice(0, 4);
+}
+
+function buildEvidenceGaps(problem: Problem, combined: string, complexity: string, explanation: string, missingEdgeCases: string[]) {
+  const gaps: string[] = [];
+  if (!combined.includes("invariant")) gaps.push("Did not formally define the core invariant.");
+  if (!complexity.includes("space")) gaps.push("Space complexity needs a clearer justification.");
+  if (!explanation.includes("example") && !explanation.includes("walk")) gaps.push("Could include a concrete walkthrough to make the explanation easier to inspect.");
+  gaps.push(...missingEdgeCases.map((item) => `Limited coverage: ${item}.`));
+  if (problem.difficulty === "HARD" && !combined.includes("tradeoff")) gaps.push("Hard problem answer should discuss tradeoffs or alternative approaches.");
+  return uniqueList(gaps).slice(0, 4);
+}
+
+function uniqueList(items: string[]) {
+  return Array.from(new Set(items));
+}
+
+function scoreBand(score: number) {
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Strong";
+  if (score >= 70) return "Promising";
+  if (score >= 60) return "Developing";
+  return "Needs work";
+}
+
+function percentileLabel(score: number) {
+  if (score >= 90) return "Top 10% signal";
+  if (score >= 80) return "Top 20% signal";
+  if (score >= 70) return "Top 35% signal";
+  if (score >= 60) return "Practice-ready";
+  return "Early attempt";
 }

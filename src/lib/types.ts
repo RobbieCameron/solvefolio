@@ -40,6 +40,10 @@ export type InterviewFeedback = {
   score: number;
   summary: string;
   missingEdgeCases: string[];
+  evidenceStrengths?: string[];
+  evidenceGaps?: string[];
+  scoreBand?: string;
+  percentileLabel?: string;
   createdAt: string;
 };
 

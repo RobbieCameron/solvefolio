@@ -2,8 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Brain,
+  CheckCircle2,
   Code2,
   Gauge,
   LogOut,
@@ -13,13 +15,12 @@ import {
   Trophy
 } from "lucide-react";
 import clsx from "clsx";
-import type { CompanyTrack, Flashcard, InterviewFeedback, MockInterview, Note, Problem } from "@/lib/types";
+import type { Flashcard, InterviewFeedback, MockInterview, Note, Problem } from "@/lib/types";
 
 type SessionUser = { id: string; email: string; name: string };
 type Workspace = { problems: Problem[]; notes: Note[]; flashcards: Flashcard[]; feedback: InterviewFeedback[]; mocks: MockInterview[] };
 
 const emptyWorkspace: Workspace = { problems: [], notes: [], flashcards: [], feedback: [], mocks: [] };
-const companyOptions: CompanyTrack[] = ["Google", "Meta", "Amazon", "Palantir"];
 
 export default function Home() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -27,14 +28,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
-  const [selectedTrack, setSelectedTrack] = useState<CompanyTrack | "All">("All");
   const [selectedProblemId, setSelectedProblemId] = useState("");
   const [coachState, setCoachState] = useState<"idle" | "processing">("idle");
 
-  const visibleProblems = selectedTrack === "All" ? workspace.problems : workspace.problems.filter((problem) => problem.company === selectedTrack);
+  const visibleProblems = workspace.problems;
   const selectedProblem = visibleProblems.find((problem) => problem.id === selectedProblemId) ?? visibleProblems[0] ?? workspace.problems[0];
   const latestFeedback = workspace.feedback[0];
   const selectedFeedback = selectedProblem ? workspace.feedback.find((item) => item.problemId === selectedProblem.id) : latestFeedback;
+  const previousFeedback = latestFeedback
+    ? workspace.feedback.filter((item) => item.problemId === latestFeedback.problemId && item.id !== latestFeedback.id)[0]
+    : undefined;
 
   const proofStats = useMemo(() => {
     const reports = workspace.feedback.length;
@@ -101,20 +104,6 @@ export default function Home() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
     setWorkspace(emptyWorkspace);
-  }
-
-  async function startCompanyTrack(company: CompanyTrack) {
-    setSelectedTrack(company);
-    const response = await fetch("/api/company-tracks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      setNotice(data.drills.length ? `${company} track loaded with ${data.drills.length} canonical problems.` : `${company} track is ready.`);
-      await refresh();
-    }
   }
 
   async function submitFeedback(event: FormEvent<HTMLFormElement>) {
@@ -263,12 +252,9 @@ export default function Home() {
               </div>
               <h2 className="text-xl font-semibold">Problem Library</h2>
             </div>
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              <TrackButton active={selectedTrack === "All"} onClick={() => setSelectedTrack("All")} label="All" />
-              {companyOptions.map((company) => (
-                <TrackButton key={company} active={selectedTrack === company} onClick={() => startCompanyTrack(company)} label={company} />
-              ))}
-            </div>
+            <p className="mb-4 text-sm leading-6 text-ink/65">
+              Canonical public interview problems. The value is not the list; it is the evidence you create after solving one.
+            </p>
             <div className="grid gap-2">
               {visibleProblems.map((problem) => (
                 <button
@@ -328,9 +314,15 @@ export default function Home() {
               </div>
               {selectedFeedback ? (
                 <div className="grid gap-4">
-                  <div>
-                    <div className="text-5xl font-semibold">{selectedFeedback.score}</div>
-                    <p className="mt-1 text-sm text-ink/60">overall interview score</p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-5xl font-semibold">{selectedFeedback.score}<span className="text-2xl text-ink/45">/100</span></div>
+                      <p className="mt-1 text-sm text-ink/60">{scoreBand(selectedFeedback)} · {percentileLabel(selectedFeedback)}</p>
+                    </div>
+                    <div className="rounded-lg bg-paper px-3 py-2 text-center">
+                      <div className="text-lg font-semibold">{progressionText(selectedFeedback, previousFeedback)}</div>
+                      <div className="text-xs text-ink/55">progression</div>
+                    </div>
                   </div>
                   <p className="text-sm leading-6 text-ink/70">{selectedFeedback.summary}</p>
                   <div className="grid grid-cols-2 gap-2">
@@ -370,15 +362,23 @@ export default function Home() {
                       <h3 className="mt-1 text-xl font-semibold">{problemTitle(workspace.problems, latestFeedback.problemId)}</h3>
                     </div>
                     <div className="rounded-lg bg-white px-3 py-2 text-center">
-                      <div className="text-2xl font-semibold">{latestFeedback.score}</div>
-                      <div className="text-xs text-ink/60">score</div>
+                      <div className="text-2xl font-semibold">{latestFeedback.score}<span className="text-sm text-ink/45">/100</span></div>
+                      <div className="text-xs text-ink/60">{scoreBand(latestFeedback)}</div>
                     </div>
                   </div>
-                  <p className="mt-4 text-sm leading-6 text-ink/70">{latestFeedback.summary}</p>
-                  <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge label={percentileLabel(latestFeedback)} />
+                    <Badge label={progressionText(latestFeedback, previousFeedback)} />
                     <Badge label={`${latestFeedback.communication} communication`} />
-                    <Badge label={`${latestFeedback.timeComplexity} complexity`} />
-                    <Badge label={`${latestFeedback.edgeCases} edge cases`} />
+                  </div>
+                  <p className="mt-4 text-sm font-semibold">Evidence</p>
+                  <div className="mt-3 grid gap-3">
+                    {evidenceStrengths(latestFeedback).map((item) => (
+                      <EvidenceRow key={item} tone="good" text={item} />
+                    ))}
+                    {evidenceGaps(latestFeedback).map((item) => (
+                      <EvidenceRow key={item} tone="warn" text={item} />
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -389,20 +389,6 @@ export default function Home() {
         </section>
       </section>
     </main>
-  );
-}
-
-function TrackButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      className={clsx(
-        "focus-ring h-10 rounded-lg border px-3 text-sm font-semibold",
-        active ? "border-ink bg-ink text-white" : "border-ink/10 bg-paper text-ink"
-      )}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -429,6 +415,16 @@ function Badge({ label }: { label: string }) {
   return <span className="rounded bg-white px-2 py-2 text-center font-semibold text-ink/70">{label}</span>;
 }
 
+function EvidenceRow({ tone, text }: { tone: "good" | "warn"; text: string }) {
+  const Icon = tone === "good" ? CheckCircle2 : AlertTriangle;
+  return (
+    <div className="flex gap-3 rounded-lg bg-white p-3 text-sm leading-5 text-ink/72">
+      <Icon className={clsx("mt-0.5 shrink-0", tone === "good" ? "text-moss" : "text-coral")} size={17} />
+      <span>{text}</span>
+    </div>
+  );
+}
+
 function EmptyReport() {
   return (
     <div className="grid gap-4">
@@ -448,6 +444,44 @@ function EmptyReport() {
 
 function problemTitle(problems: Problem[], problemId: string) {
   return problems.find((problem) => problem.id === problemId)?.title ?? "Coach report";
+}
+
+function evidenceStrengths(feedback: InterviewFeedback) {
+  return feedback.evidenceStrengths?.length
+    ? feedback.evidenceStrengths
+    : ["Submitted a complete solution, complexity analysis, and interviewer explanation."];
+}
+
+function evidenceGaps(feedback: InterviewFeedback) {
+  if (feedback.evidenceGaps?.length) return feedback.evidenceGaps;
+  if (feedback.missingEdgeCases.length) return feedback.missingEdgeCases.map((item) => `Limited coverage: ${item}.`);
+  return ["Add one adversarial test and one follow-up optimization."];
+}
+
+function scoreBand(feedback: InterviewFeedback) {
+  if (feedback.scoreBand) return feedback.scoreBand;
+  if (feedback.score >= 90) return "Excellent";
+  if (feedback.score >= 80) return "Strong";
+  if (feedback.score >= 70) return "Promising";
+  if (feedback.score >= 60) return "Developing";
+  return "Needs work";
+}
+
+function percentileLabel(feedback: InterviewFeedback) {
+  if (feedback.percentileLabel) return feedback.percentileLabel;
+  if (feedback.score >= 90) return "Top 10% signal";
+  if (feedback.score >= 80) return "Top 20% signal";
+  if (feedback.score >= 70) return "Top 35% signal";
+  if (feedback.score >= 60) return "Practice-ready";
+  return "Early attempt";
+}
+
+function progressionText(current: InterviewFeedback, previous?: InterviewFeedback) {
+  if (!previous) return "First scored attempt";
+  const diff = current.score - previous.score;
+  if (diff > 0) return `+${diff} improvement`;
+  if (diff < 0) return `${diff} regression`;
+  return "No score change";
 }
 
 function difficultyTone(difficulty: Problem["difficulty"]) {

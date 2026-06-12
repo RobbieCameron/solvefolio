@@ -72,6 +72,10 @@ model InterviewFeedback {
   score          Int
   summary        String
   missingEdgeCases String[]
+  evidenceStrengths String[]
+  evidenceGaps      String[]
+  scoreBand         String?
+  percentileLabel   String?
   createdAt      DateTime @default(now())
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
