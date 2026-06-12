@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime    @default(now())
+  problems     Problem[]
+  notes        Note[]
+  flashcards   Flashcard[]
+  feedback     InterviewFeedback[]
+  mocks        MockInterview[]
+}
+
+model Problem {
+  id          String        @id @default(cuid())
+  title       String
+  topic       String
+  difficulty  Difficulty
+  status      ProblemStatus @default(TODO)
+  prompt      String
+  solution    String?
+  solveTimeMinutes Int?
+  company     CompanyTrack?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  feedback    InterviewFeedback[]
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  topic     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Flashcard {
+  id        String   @id @default(cuid())
+  front     String
+  back      String
+  topic     String
+  confidence Int     @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InterviewFeedback {
+  id             String   @id @default(cuid())
+  solution       String
+  complexity     String
+  explanation    String
+  correctness    Int
+  timeComplexity Int
+  communication  Int
+  edgeCases      Int
+  score          Int
+  summary        String
+  missingEdgeCases String[]
+  createdAt      DateTime @default(now())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problemId      String
+  problem        Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model MockInterview {
+  id        String        @id @default(cuid())
+  topic     String
+  company   CompanyTrack?
+  question  String
+  followUps String[]
+  answers   String[]
+  feedback  String?
+  score     Int?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ProblemStatus {
+  TODO
+  SOLVING
+  SOLVED
+}
+
+enum CompanyTrack {
+  Google
+  Meta
+  Amazon
+  Palantir
+}
