@@ -13,7 +13,7 @@ import type {
   User
 } from "./types";
 
-const dataDir = path.join(process.cwd(), "data");
+const dataDir = process.env.VERCEL ? path.join("/tmp", "solvefolio-data") : path.join(process.cwd(), "data");
 const dataFile = path.join(dataDir, "local-db.json");
 
 const now = () => new Date().toISOString();
